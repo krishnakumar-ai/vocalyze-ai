@@ -118,6 +118,10 @@ def sms_reply():
     msg = MessagingResponse()
     msg.message(response)
     return str(msg)
+@app.route("/")
+def home():
+    return "Welcome to Vocalyze AI - Flask App is running!"
+
 
 if __name__ == "__main__":
     #app.run(debug=True)
