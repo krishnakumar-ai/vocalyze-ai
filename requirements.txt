@@ -1,0 +1,7 @@
+flask
+twilio
+textblob
+httpx
+python-dotenv
+streamlit
+pandas
