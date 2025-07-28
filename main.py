@@ -4,24 +4,43 @@ from textblob import TextBlob
 from collections import defaultdict
 
 app = Flask(__name__)
-app.secret_key = "your-secret-key"  # Required for Flask sessions
+app.secret_key = "your-secret-key"  
 
-# Memory store for multiple users
+
 chat_histories = defaultdict(list)
 
+
 import csv
+import os
 from datetime import datetime
 
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 def log_chat(user_msg, sentiment, intent, bot_reply):
-    with open("chat_logs.csv", mode="a", newline='', encoding='utf-8') as file:
-        writer = csv.writer(file)
-        writer.writerow([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            user_msg,
-            sentiment,
-            intent,
-            bot_reply
-        ])
+    try:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        cursor = conn.cursor()
+
+        insert_query = """
+        INSERT INTO chat_logs (user_message, sentiment, intent, bot_reply)
+        VALUES (%s, %s, %s, %s)
+        """
+        cursor.execute(insert_query, (user_msg, sentiment, intent, bot_reply))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print("❌ Database Error:", e)
+
+
 
 def analyze_sentiment(text):
     blob = TextBlob(text)
@@ -47,26 +66,23 @@ def detect_intent(text):
     else:
         return "General"
 
-
 import httpx
-import os
 
 from dotenv import load_dotenv
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
- # Replace with your Groq key
 
 def generate_gpt_response(user_id, message, sentiment, intent):
     prompt_intro = "You are a helpful telecom customer service assistant."
     
-    # 🧠 Get chat history for this user
+    
     history = chat_histories[user_id]
 
-    # 🧱 Add current message to the history
+    
     history.append({"role": "user", "content": f"User: {message} (Sentiment: {sentiment}, Intent: {intent})"})
 
-    # 🧠 Build full memory-aware messages list
+    
     messages = [{"role": "system", "content": prompt_intro}] + history
 
     try:
@@ -87,7 +103,6 @@ def generate_gpt_response(user_id, message, sentiment, intent):
         result = response.json()
         reply = result["choices"][0]["message"]["content"].strip()
 
-        # Add assistant reply to history
         history.append({"role": "assistant", "content": reply})
 
         return reply
@@ -95,7 +110,6 @@ def generate_gpt_response(user_id, message, sentiment, intent):
     except Exception as e:
         print("❌ GPT Error:", e)
         return "Sorry, I'm currently having trouble generating a response."
-
 
 @app.route("/sms", methods=["POST"])
 def sms_reply():
@@ -122,10 +136,6 @@ def sms_reply():
 def home():
     return "Welcome to Vocalyze AI - Flask App is running!"
 
-
 if __name__ == "__main__":
-    #app.run(debug=True)
-    #import os
-
     port = int(os.environ.get("PORT", 5000))  # Use Render-provided port if available
     app.run(host="0.0.0.0", port=port)
