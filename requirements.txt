@@ -5,3 +5,9 @@ httpx
 python-dotenv
 streamlit
 pandas
+
+streamlit
+psycopg2-binary
+python-dotenv
+pandas
+sqlalchemy
